@@ -1,58 +1,54 @@
 import { ImageFormat, ImageSize } from '../types';
 
-function isBlobUrl(url: string): boolean {
-  return url.startsWith('blob:');
-}
-
-async function fetchAsBlob(imageUrl: string): Promise<Blob> {
-  if (isBlobUrl(imageUrl)) {
-    const response = await fetch(imageUrl);
-    return response.blob();
-  }
-  const response = await fetch(imageUrl);
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-  return response.blob();
-}
-
 export async function downloadImage(imageUrl: string, fileName: string, format: ImageFormat): Promise<void> {
   try {
-    const blob = await fetchAsBlob(imageUrl);
-    let finalBlob = blob;
+    const blob = await fetchImageAsBlob(imageUrl);
 
     if (format === 'jpg') {
       const objectUrl = URL.createObjectURL(blob);
       try {
         const jpgDataUrl = await convertToJpg(objectUrl);
-        const jpgResponse = await fetch(jpgDataUrl);
-        finalBlob = await jpgResponse.blob();
+        const jpgBlob = await (await fetch(jpgDataUrl)).blob();
+        await triggerDownload(jpgBlob, `${fileName}.jpg`);
       } finally {
         URL.revokeObjectURL(objectUrl);
       }
+    } else {
+      await triggerDownload(blob, `${fileName}.png`);
     }
+  } catch {
+    window.open(imageUrl, '_blank');
+  }
+}
 
-    const url = window.URL.createObjectURL(finalBlob);
-    try {
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${fileName}.${format}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } finally {
-      window.URL.revokeObjectURL(url);
-    }
-  } catch (e) {
-    console.error('Download failed:', e);
-    throw new Error('图片下载失败');
+async function fetchImageAsBlob(url: string): Promise<Blob> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  const blob = await response.blob();
+  if (blob.size === 0 || !blob.type.startsWith('image/')) {
+    throw new Error('Invalid image response');
+  }
+  return blob;
+}
+
+async function triggerDownload(blob: Blob, filename: string): Promise<void> {
+  const url = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }
 
 export async function convertToJpg(imageUrl: string): Promise<string> {
-  const blob = await fetchAsBlob(imageUrl);
-  const objectUrl = URL.createObjectURL(blob);
-
   return new Promise<string>((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -68,19 +64,13 @@ export async function convertToJpg(imageUrl: string): Promise<string> {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-        resolve(dataUrl);
+        resolve(canvas.toDataURL('image/jpeg', 0.95));
       } catch (e) {
         reject(e);
-      } finally {
-        URL.revokeObjectURL(objectUrl);
       }
     };
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error('图片加载失败'));
-    };
-    img.src = objectUrl;
+    img.onerror = () => reject(new Error('图片加载失败'));
+    img.src = imageUrl;
   });
 }
 

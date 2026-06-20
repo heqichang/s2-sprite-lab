@@ -8,6 +8,22 @@ export default defineConfig({
   build: {
     sourcemap: 'hidden',
   },
+  server: {
+    proxy: {
+      '/api/text-to-image': {
+        target: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api\/text-to-image/, ''),
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.removeHeader('origin');
+            proxyReq.removeHeader('referer');
+          });
+        },
+      },
+    },
+  },
   plugins: [
     react({
       babel: {

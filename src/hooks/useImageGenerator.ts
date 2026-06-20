@@ -3,15 +3,6 @@ import { useGeneratorStore } from '../store/useGeneratorStore';
 import { buildPrompt } from '../utils/promptUtils';
 import { IMAGE_SIZE_OPTIONS } from '../types';
 
-function loadImage(url: string): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve();
-    img.onerror = () => reject(new Error('图片加载失败，请重试'));
-    img.src = url;
-  });
-}
-
 export function useImageGenerator() {
   const {
     prompt,
@@ -41,24 +32,45 @@ export function useImageGenerator() {
       const apiSize = sizeOption?.apiSize || 'square';
       const finalPrompt = encodeURIComponent(buildPrompt(prompt, type, style, size));
 
-      const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${finalPrompt}&image_size=${apiSize}`;
+      const imageUrl = `/api/text-to-image?prompt=${finalPrompt}&image_size=${apiSize}`;
 
       const progressInterval = setInterval(() => {
         setProgress((prev) => (prev < 90 ? prev + 5 : prev));
       }, 200);
 
-      await loadImage(imageUrl);
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`生成失败: HTTP ${response.status}`);
+      }
+      const blob = await response.blob();
+      if (blob.size === 0 || !blob.type.startsWith('image/')) {
+        throw new Error('返回数据无效，请重试');
+      }
+
+      const objectUrl = URL.createObjectURL(blob);
+
+      await new Promise<void>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve();
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('图片解码失败'));
+        };
+        img.src = objectUrl;
+      });
 
       clearInterval(progressInterval);
       setProgress(100);
 
-      setCurrentImage(imageUrl, imageUrl);
+      const remoteUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${finalPrompt}&image_size=${apiSize}`;
+
+      setCurrentImage(objectUrl, remoteUrl);
       addRecord({
         prompt,
         type,
         style,
         size,
-        imageUrl,
+        imageUrl: remoteUrl,
       });
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : '生成失败，请重试';
@@ -84,24 +96,45 @@ export function useImageGenerator() {
       const apiSize = sizeOption?.apiSize || 'square';
       const finalPrompt = encodeURIComponent(buildPrompt(recordPrompt, recordType, recordStyle, recordSize));
 
-      const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${finalPrompt}&image_size=${apiSize}`;
+      const imageUrl = `/api/text-to-image?prompt=${finalPrompt}&image_size=${apiSize}`;
 
       const progressInterval = setInterval(() => {
         setProgress((prev) => (prev < 90 ? prev + 5 : prev));
       }, 200);
 
-      await loadImage(imageUrl);
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`生成失败: HTTP ${response.status}`);
+      }
+      const blob = await response.blob();
+      if (blob.size === 0 || !blob.type.startsWith('image/')) {
+        throw new Error('返回数据无效，请重试');
+      }
+
+      const objectUrl = URL.createObjectURL(blob);
+
+      await new Promise<void>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve();
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('图片解码失败'));
+        };
+        img.src = objectUrl;
+      });
 
       clearInterval(progressInterval);
       setProgress(100);
 
-      setCurrentImage(imageUrl, imageUrl);
+      const remoteUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${finalPrompt}&image_size=${apiSize}`;
+
+      setCurrentImage(objectUrl, remoteUrl);
       addRecord({
         prompt: recordPrompt,
         type: recordType,
         style: recordStyle,
         size: recordSize,
-        imageUrl,
+        imageUrl: remoteUrl,
       });
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : '生成失败，请重试';

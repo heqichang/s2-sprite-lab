@@ -1,36 +1,54 @@
 import { ImageFormat, ImageSize } from '../types';
 
-export async function downloadImage(imageUrl: string, fileName: string, format: ImageFormat): Promise<void> {
+function isBlobUrl(url: string): boolean {
+  return url.startsWith('blob:');
+}
+
+function remoteToProxy(url: string): string {
   try {
-    const blob = await fetchImageAsBlob(imageUrl);
+    const u = new URL(url);
+    if (u.pathname.includes('/text_to_image')) {
+      return `/api/text-to-image${u.search}`;
+    }
+  } catch {}
+  return url;
+}
+
+export async function downloadImage(
+  imageUrl: string,
+  fileName: string,
+  format: ImageFormat
+): Promise<void> {
+  try {
+    let blob: Blob;
+
+    if (isBlobUrl(imageUrl)) {
+      const res = await fetch(imageUrl);
+      blob = await res.blob();
+    } else {
+      const fetchUrl = imageUrl.startsWith('http') ? remoteToProxy(imageUrl) : imageUrl;
+      const res = await fetch(fetchUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      blob = await res.blob();
+      if (blob.size === 0) throw new Error('Empty response');
+    }
 
     if (format === 'jpg') {
-      const objectUrl = URL.createObjectURL(blob);
+      const objUrl = URL.createObjectURL(blob);
       try {
-        const jpgDataUrl = await convertToJpg(objectUrl);
+        const jpgDataUrl = await convertToJpg(objUrl);
         const jpgBlob = await (await fetch(jpgDataUrl)).blob();
         await triggerDownload(jpgBlob, `${fileName}.jpg`);
       } finally {
-        URL.revokeObjectURL(objectUrl);
+        URL.revokeObjectURL(objUrl);
       }
     } else {
       await triggerDownload(blob, `${fileName}.png`);
     }
-  } catch {
+  } catch (e) {
+    console.warn('Download via fetch failed, fallback to new tab:', e);
     window.open(imageUrl, '_blank');
   }
-}
-
-async function fetchImageAsBlob(url: string): Promise<Blob> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-  const blob = await response.blob();
-  if (blob.size === 0 || !blob.type.startsWith('image/')) {
-    throw new Error('Invalid image response');
-  }
-  return blob;
 }
 
 async function triggerDownload(blob: Blob, filename: string): Promise<void> {

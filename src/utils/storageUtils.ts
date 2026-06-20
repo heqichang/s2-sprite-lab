@@ -1,8 +1,15 @@
-import { GenerationRecord, LibraryAsset } from '../types';
+import { GenerationRecord, LibraryAsset, AiModelConfig } from '../types';
 
 const RECORDS_KEY = 'sprite-lab-records';
 const LIBRARY_KEY = 'sprite-lab-library';
+const CONFIG_KEY = 'sprite-lab-config';
 const MAX_RECORDS = 20;
+
+const DEFAULT_MODEL_CONFIG: AiModelConfig = {
+  provider: 'trae',
+  apiKey: '',
+  modelName: '',
+};
 
 export function loadRecords(): GenerationRecord[] {
   try {
@@ -36,5 +43,23 @@ export function saveLibrary(library: LibraryAsset[]): void {
     localStorage.setItem(LIBRARY_KEY, JSON.stringify(library));
   } catch (e) {
     console.error('Failed to save library:', e);
+  }
+}
+
+export function loadModelConfig(): AiModelConfig {
+  try {
+    const data = localStorage.getItem(CONFIG_KEY);
+    if (data) {
+      return { ...DEFAULT_MODEL_CONFIG, ...JSON.parse(data) };
+    }
+  } catch {}
+  return { ...DEFAULT_MODEL_CONFIG };
+}
+
+export function saveModelConfig(config: AiModelConfig): void {
+  try {
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+  } catch (e) {
+    console.error('Failed to save model config:', e);
   }
 }

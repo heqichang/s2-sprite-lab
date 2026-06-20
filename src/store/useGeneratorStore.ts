@@ -6,8 +6,10 @@ import {
   ImageSize,
   GenerationRecord,
   LibraryAsset,
+  AiModelConfig,
+  AiModelProvider,
 } from '../types';
-import { loadRecords, saveRecords, loadLibrary, saveLibrary } from '../utils/storageUtils';
+import { loadRecords, saveRecords, loadLibrary, saveLibrary, loadModelConfig, saveModelConfig } from '../utils/storageUtils';
 import { generateId, generateFileName } from '../utils/promptUtils';
 
 interface GeneratorActions {
@@ -24,6 +26,10 @@ interface GeneratorActions {
   addToLibrary: (asset: Omit<LibraryAsset, 'id' | 'createdAt'> & { imageUrl?: string }) => void;
   removeFromLibrary: (id: string) => void;
   loadFromStorage: () => void;
+  setModelProvider: (provider: AiModelProvider) => void;
+  setApiKey: (apiKey: string) => void;
+  setModelName: (modelName: string) => void;
+  setModelConfig: (config: Partial<AiModelConfig>) => void;
 }
 
 export const useGeneratorStore = create<GeneratorState & GeneratorActions>((set, get) => ({
@@ -37,6 +43,11 @@ export const useGeneratorStore = create<GeneratorState & GeneratorActions>((set,
   error: null,
   records: [],
   library: [],
+  modelConfig: {
+    provider: 'trae',
+    apiKey: '',
+    modelName: '',
+  },
 
   setPrompt: (prompt) => set({ prompt }),
   setType: (type) => set({ type }),
@@ -93,6 +104,31 @@ export const useGeneratorStore = create<GeneratorState & GeneratorActions>((set,
     set({
       records: loadRecords(),
       library: loadLibrary(),
+      modelConfig: loadModelConfig(),
     });
+  },
+
+  setModelProvider: (provider) => {
+    const newConfig = { ...get().modelConfig, provider };
+    set({ modelConfig: newConfig });
+    saveModelConfig(newConfig);
+  },
+
+  setApiKey: (apiKey) => {
+    const newConfig = { ...get().modelConfig, apiKey };
+    set({ modelConfig: newConfig });
+    saveModelConfig(newConfig);
+  },
+
+  setModelName: (modelName) => {
+    const newConfig = { ...get().modelConfig, modelName };
+    set({ modelConfig: newConfig });
+    saveModelConfig(newConfig);
+  },
+
+  setModelConfig: (config) => {
+    const newConfig = { ...get().modelConfig, ...config };
+    set({ modelConfig: newConfig });
+    saveModelConfig(newConfig);
   },
 }));

@@ -3,6 +3,30 @@ export type ArtStyle = 'pixel' | 'cartoon' | 'handdrawn' | 'japanese-rpg' | 'dar
 export type ImageSize = '32x32' | '64x64' | '128x128' | '256x256' | '512x512' | '1024x1024';
 export type ImageFormat = 'png' | 'jpg';
 
+export type AiModelProvider = 'trae' | 'dashscope' | 'volcengine';
+
+export interface AiModelConfig {
+  provider: AiModelProvider;
+  apiKey: string;
+  modelName: string;
+}
+
+export const AI_MODEL_PROVIDERS: { value: AiModelProvider; label: string; desc: string }[] = [
+  { value: 'trae', label: 'Trae API', desc: '内置默认模型' },
+  { value: 'dashscope', label: '通义万相', desc: '阿里云 DashScope' },
+  { value: 'volcengine', label: '豆包 Seedream', desc: '火山引擎方舟' },
+];
+
+export const DASHSCOPE_MODELS: { value: string; label: string }[] = [
+  { value: 'wanx-v1', label: '通义万相 v1' },
+  { value: 'wanx2.1-t2i', label: '通义万相 2.1' },
+];
+
+export const VOLCENGINE_MODELS: { value: string; label: string }[] = [
+  { value: 'seedream-4.0', label: 'Seedream 4.0' },
+  { value: 'seedream-3.0', label: 'Seedream 3.0' },
+];
+
 export interface GenerationRecord {
   id: string;
   prompt: string;
@@ -33,6 +57,7 @@ export interface GeneratorState {
   error: string | null;
   records: GenerationRecord[];
   library: LibraryAsset[];
+  modelConfig: AiModelConfig;
 }
 
 export const ASSET_TYPE_OPTIONS: { value: AssetType; label: string; icon: string }[] = [

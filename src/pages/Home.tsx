@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { InputPanel } from '../components/InputPanel';
 import { PreviewPanel } from '../components/PreviewPanel';
 import { HistoryPanel } from '../components/HistoryPanel';
+import { SettingsPanel } from '../components/SettingsPanel';
 import { useGeneratorStore } from '../store/useGeneratorStore';
 import { Gamepad2, Sparkles } from 'lucide-react';
 
@@ -61,6 +62,7 @@ export function Home() {
                 <div className="w-2 h-2 rounded-full bg-neon-green animate-pulse" />
                 <span className="font-mono text-xs text-gray-400">AI 引擎就绪</span>
               </div>
+              <SettingsPanel />
             </div>
           </div>
 

@@ -96,3 +96,77 @@ export function getPixelDimensions(size: ImageSize): { width: number; height: nu
   const [w, h] = size.split('x').map(Number);
   return { width: w, height: h };
 }
+
+export async function resizeImage(
+  blob: Blob,
+  targetWidth: number,
+  targetHeight: number,
+): Promise<Blob> {
+  return new Promise<Blob>((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas context not available'));
+          return;
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+        canvas.toBlob(
+          (resultBlob) => {
+            URL.revokeObjectURL(url);
+            if (resultBlob) {
+              resolve(resultBlob);
+            } else {
+              reject(new Error('Failed to convert canvas to blob'));
+            }
+          },
+          'image/png',
+          1.0
+        );
+      } catch (e) {
+        URL.revokeObjectURL(url);
+        reject(e);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('图片加载失败'));
+    };
+    img.src = url;
+  });
+}
+
+export function getClosestSupportedSize(
+  targetWidth: number,
+  targetHeight: number,
+  supportedSizes: Array<{ w: number; h: number; label?: string }>,
+): { w: number; h: number } {
+  const targetPixels = targetWidth * targetHeight;
+  const targetRatio = targetWidth / targetHeight;
+
+  let bestMatch = supportedSizes[0];
+  let bestScore = Infinity;
+
+  for (const size of supportedSizes) {
+    const sizePixels = size.w * size.h;
+    const sizeRatio = size.w / size.h;
+
+    const pixelDiff = Math.abs(Math.log(sizePixels) - Math.log(Math.max(targetPixels, 512 * 512)));
+    const ratioDiff = Math.abs(Math.log(sizeRatio) - Math.log(targetRatio));
+    const score = pixelDiff * 2 + ratioDiff * 3;
+
+    if (score < bestScore) {
+      bestScore = score;
+      bestMatch = size;
+    }
+  }
+
+  return bestMatch;
+}

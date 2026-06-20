@@ -1,35 +1,102 @@
 import { useState, useCallback } from 'react';
 import { useGeneratorStore } from '../store/useGeneratorStore';
 import { buildPrompt } from '../utils/promptUtils';
-import { getPixelDimensions } from '../utils/imageUtils';
+import { getPixelDimensions, resizeImage, getClosestSupportedSize } from '../utils/imageUtils';
 import { IMAGE_SIZE_OPTIONS, DASHSCOPE_MODELS } from '../types';
 import type { ImageSize, AiModelProvider, DashscopeApiMode } from '../types';
 
-function getApiSize(size: ImageSize, provider: AiModelProvider): string {
-  const { width, height } = getPixelDimensions(size);
-  if (provider === 'trae') {
-    const sizeOption = IMAGE_SIZE_OPTIONS.find((s) => s.value === size);
-    return sizeOption?.apiSize || 'square';
-  }
-  if (provider === 'dashscope') {
-    return `${width}*${height}`;
-  }
-  return `${width}x${height}`;
-}
+const QWEN_IMAGE_SYNC_SIZES = [
+  { w: 2048, h: 2048 },
+  { w: 1792, h: 1792 },
+  { w: 1536, h: 1536 },
+  { w: 1344, h: 1344 },
+  { w: 1024, h: 1024 },
+  { w: 2048, h: 1152 },
+  { w: 1152, h: 2048 },
+  { w: 2368, h: 1728 },
+  { w: 1728, h: 2368 },
+  { w: 2688, h: 1536 },
+  { w: 1536, h: 2688 },
+];
+
+const QWEN_IMAGE_ASYNC_SIZES = [
+  { w: 1664, h: 928 },
+  { w: 1472, h: 1104 },
+  { w: 1328, h: 1328 },
+  { w: 1104, h: 1472 },
+  { w: 928, h: 1664 },
+];
+
+const WAN26_SYNC_SIZES = [
+  { w: 1280, h: 1280 },
+  { w: 1344, h: 1344 },
+  { w: 1440, h: 1440 },
+  { w: 1472, h: 1104 },
+  { w: 1104, h: 1472 },
+  { w: 1696, h: 960 },
+  { w: 960, h: 1696 },
+  { w: 1600, h: 1024 },
+  { w: 1024, h: 1600 },
+];
+
+const WAN22_ASYNC_SIZES = [
+  { w: 1440, h: 1440 },
+  { w: 1280, h: 1280 },
+  { w: 1024, h: 1024 },
+  { w: 768, h: 768 },
+  { w: 1440, h: 816 },
+  { w: 816, h: 1440 },
+  { w: 1280, h: 720 },
+  { w: 720, h: 1280 },
+];
+
+const VOLCENGINE_SIZES = [
+  { w: 1024, h: 1024 },
+  { w: 1024, h: 1408 },
+  { w: 1408, h: 1024 },
+  { w: 768, h: 768 },
+  { w: 576, h: 1024 },
+  { w: 1024, h: 576 },
+  { w: 1408, h: 768 },
+  { w: 768, h: 1408 },
+];
 
 function getDashscopeApiMode(modelName: string): DashscopeApiMode {
   const modelInfo = DASHSCOPE_MODELS.find((m) => m.value === modelName);
   return modelInfo?.apiMode || 'async-v1';
 }
 
-function mapToDashscopeSize(size: string, modelName: string): string {
+function getDashscopeSupportedSizes(modelName: string): Array<{ w: number; h: number }> {
+  const apiMode = getDashscopeApiMode(modelName);
   if (modelName.startsWith('qwen-image')) {
-    return '1024*1024';
+    return apiMode === 'sync' ? QWEN_IMAGE_SYNC_SIZES : QWEN_IMAGE_ASYNC_SIZES;
   }
   if (modelName.startsWith('wan2.6')) {
-    return '1280*1280';
+    return apiMode === 'sync' ? WAN26_SYNC_SIZES : WAN26_SYNC_SIZES;
   }
-  return '1024*1024';
+  return WAN22_ASYNC_SIZES;
+}
+
+function getApiSize(size: ImageSize, provider: AiModelProvider, modelName?: string): string {
+  const { width, height } = getPixelDimensions(size);
+
+  if (provider === 'trae') {
+    const sizeOption = IMAGE_SIZE_OPTIONS.find((s) => s.value === size);
+    return sizeOption?.apiSize || 'square';
+  }
+
+  if (provider === 'dashscope' && modelName) {
+    const supported = getDashscopeSupportedSizes(modelName);
+    const best = getClosestSupportedSize(width, height, supported);
+    return `${best.w}*${best.h}`;
+  }
+
+  if (provider === 'volcengine') {
+    const best = getClosestSupportedSize(width, height, VOLCENGINE_SIZES);
+    return `${best.w}x${best.h}`;
+  }
+
+  return `${width}x${height}`;
 }
 
 async function generateWithTrae(prompt: string, apiSize: string): Promise<{ blob: Blob; url: string }> {
@@ -51,6 +118,7 @@ async function generateWithDashscopeSync(
   prompt: string,
   modelName: string,
   apiKey: string,
+  size: string,
 ): Promise<{ blob: Blob; url: string }> {
   const submitUrl = '/api/dashscope/api/v1/services/aigc/multimodal-generation/generation';
   const res = await fetch(submitUrl, {
@@ -70,7 +138,7 @@ async function generateWithDashscopeSync(
         ],
       },
       parameters: {
-        size: mapToDashscopeSize('', modelName),
+        size,
         n: 1,
         prompt_extend: true,
         watermark: false,
@@ -100,6 +168,7 @@ async function generateWithDashscopeAsync(
   prompt: string,
   modelName: string,
   apiKey: string,
+  size: string,
   onProgress: (p: number) => void,
 ): Promise<{ blob: Blob; url: string }> {
   const submitUrl = '/api/dashscope/api/v1/services/aigc/text2image/image-synthesis';
@@ -114,7 +183,7 @@ async function generateWithDashscopeAsync(
       model: modelName,
       input: { prompt },
       parameters: {
-        size: mapToDashscopeSize('', modelName),
+        size,
         n: 1,
         prompt_extend: true,
         watermark: false,
@@ -180,6 +249,7 @@ async function generateWithDashscope(
   prompt: string,
   modelName: string,
   apiKey: string,
+  size: string,
   onProgress: (p: number) => void,
 ): Promise<{ blob: Blob; url: string }> {
   if (!apiKey) {
@@ -189,10 +259,10 @@ async function generateWithDashscope(
   const apiMode = getDashscopeApiMode(modelName);
 
   if (apiMode === 'sync') {
-    return generateWithDashscopeSync(prompt, modelName, apiKey);
+    return generateWithDashscopeSync(prompt, modelName, apiKey, size);
   }
 
-  return generateWithDashscopeAsync(prompt, modelName, apiKey, onProgress);
+  return generateWithDashscopeAsync(prompt, modelName, apiKey, size, onProgress);
 }
 
 async function generateWithVolcengine(
@@ -271,7 +341,8 @@ export function useImageGenerator() {
     setProgress(0);
 
     try {
-      const apiSize = getApiSize(size, provider);
+      const apiSize = getApiSize(size, provider, modelName);
+      const targetDim = getPixelDimensions(size);
       const finalPrompt = buildPrompt(prompt, type, style, size);
 
       let result: { blob: Blob; url: string };
@@ -287,7 +358,7 @@ export function useImageGenerator() {
           clearInterval(progressInterval);
         }
       } else if (provider === 'dashscope') {
-        result = await generateWithDashscope(finalPrompt, modelName, apiKey, setProgress);
+        result = await generateWithDashscope(finalPrompt, modelName, apiKey, apiSize, setProgress);
       } else if (provider === 'volcengine') {
         setProgress(30);
         result = await generateWithVolcengine(finalPrompt, apiSize, apiKey, modelName);
@@ -295,7 +366,16 @@ export function useImageGenerator() {
         throw new Error('不支持的模型提供商');
       }
 
-      const objectUrl = URL.createObjectURL(result.blob);
+      setProgress(92);
+
+      let finalBlob = result.blob;
+      if (targetDim.width && targetDim.height) {
+        finalBlob = await resizeImage(result.blob, targetDim.width, targetDim.height);
+      }
+
+      setProgress(98);
+
+      const objectUrl = URL.createObjectURL(finalBlob);
 
       await new Promise<void>((resolve, reject) => {
         const img = new Image();
@@ -344,7 +424,8 @@ export function useImageGenerator() {
     setProgress(0);
 
     try {
-      const apiSize = getApiSize(recordSize, provider);
+      const apiSize = getApiSize(recordSize, provider, modelName);
+      const targetDim = getPixelDimensions(recordSize);
       const finalPrompt = buildPrompt(recordPrompt, recordType, recordStyle, recordSize);
 
       let result: { blob: Blob; url: string };
@@ -360,7 +441,7 @@ export function useImageGenerator() {
           clearInterval(progressInterval);
         }
       } else if (provider === 'dashscope') {
-        result = await generateWithDashscope(finalPrompt, modelName, apiKey, setProgress);
+        result = await generateWithDashscope(finalPrompt, modelName, apiKey, apiSize, setProgress);
       } else if (provider === 'volcengine') {
         setProgress(30);
         result = await generateWithVolcengine(finalPrompt, apiSize, apiKey, modelName);
@@ -368,7 +449,16 @@ export function useImageGenerator() {
         throw new Error('不支持的模型提供商');
       }
 
-      const objectUrl = URL.createObjectURL(result.blob);
+      setProgress(92);
+
+      let finalBlob = result.blob;
+      if (targetDim.width && targetDim.height) {
+        finalBlob = await resizeImage(result.blob, targetDim.width, targetDim.height);
+      }
+
+      setProgress(98);
+
+      const objectUrl = URL.createObjectURL(finalBlob);
 
       await new Promise<void>((resolve, reject) => {
         const img = new Image();

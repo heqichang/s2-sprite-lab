@@ -27,6 +27,12 @@ export function SettingsPanel() {
   const needsApiKey = modelConfig.provider !== 'trae';
   const needsModelName = modelConfig.provider !== 'trae';
 
+  const getModelLabel = () => {
+    const models = getModelOptions();
+    const found = models.find((m) => m.value === modelConfig.modelName);
+    return found?.label || modelConfig.modelName;
+  };
+
   return (
     <>
       <button
@@ -39,8 +45,8 @@ export function SettingsPanel() {
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-md mx-4 bg-game-card border-2 border-game-border rounded-sm shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-game-border">
+          <div className="w-full max-w-md mx-4 bg-game-card border-2 border-game-border rounded-sm shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-game-border shrink-0">
               <div className="flex items-center gap-2">
                 <Cpu className="w-5 h-5 text-neon-purple" />
                 <h3 className="font-pixel text-sm text-neon-purple">AI 模型设置</h3>
@@ -53,7 +59,7 @@ export function SettingsPanel() {
               </button>
             </div>
 
-            <div className="p-4 flex flex-col gap-4">
+            <div className="p-4 flex flex-col gap-4 overflow-y-auto">
               <div className="flex flex-col gap-2">
                 <label className="font-mono text-xs text-neon-cyan uppercase tracking-wider">
                   模型提供商
@@ -118,6 +124,15 @@ export function SettingsPanel() {
                       </option>
                     ))}
                   </select>
+                  {modelConfig.provider === 'dashscope' && (
+                    <p className="font-mono text-xs text-gray-600">
+                      {modelConfig.modelName.startsWith('qwen-image')
+                        ? 'Qwen-Image 系列擅长文字渲染与复杂布局'
+                        : modelConfig.modelName.startsWith('wan2.6')
+                          ? '万相 2.6 最新版，支持同步调用，体验最佳'
+                          : '万相 2.2 极速版，异步调用，速度更快'}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -154,7 +169,7 @@ export function SettingsPanel() {
                   </div>
                   <p className="font-mono text-xs text-gray-500">
                     {modelConfig.provider === 'dashscope' && (
-                      <>API Key 请在 <span className="text-neon-cyan">dashscope.console.aliyun.com</span> 获取</>
+                      <>API Key 请在 <span className="text-neon-cyan">bailian.console.aliyun.com</span> 获取</>
                     )}
                     {modelConfig.provider === 'volcengine' && (
                       <>API Key 请在 <span className="text-neon-cyan">console.volcengine.com/ark</span> 获取</>
@@ -176,13 +191,13 @@ export function SettingsPanel() {
                   <span className="text-neon-green">●</span> 当前模型：
                   <span className="text-white ml-1">
                     {AI_MODEL_PROVIDERS.find(p => p.value === modelConfig.provider)?.label}
-                    {modelConfig.modelName && ` · ${modelConfig.modelName}`}
+                    {modelConfig.modelName && ` · ${getModelLabel()}`}
                   </span>
                 </p>
               </div>
             </div>
 
-            <div className="p-4 border-t border-game-border">
+            <div className="p-4 border-t border-game-border shrink-0">
               <button
                 onClick={() => setIsOpen(false)}
                 className={cn(

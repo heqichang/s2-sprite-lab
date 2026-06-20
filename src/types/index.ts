@@ -5,6 +5,8 @@ export type ImageFormat = 'png' | 'jpg';
 
 export type AiModelProvider = 'trae' | 'dashscope' | 'volcengine';
 
+export type DashscopeApiMode = 'sync' | 'async-v1' | 'async-v2';
+
 export interface AiModelConfig {
   provider: AiModelProvider;
   apiKey: string;
@@ -13,18 +15,28 @@ export interface AiModelConfig {
 
 export const AI_MODEL_PROVIDERS: { value: AiModelProvider; label: string; desc: string }[] = [
   { value: 'trae', label: 'Trae API', desc: '内置默认模型' },
-  { value: 'dashscope', label: '通义万相', desc: '阿里云 DashScope' },
+  { value: 'dashscope', label: '阿里云百炼', desc: 'Qwen-Image · 万相' },
   { value: 'volcengine', label: '豆包 Seedream', desc: '火山引擎方舟' },
 ];
 
-export const DASHSCOPE_MODELS: { value: string; label: string }[] = [
-  { value: 'wanx-v1', label: '通义万相 v1' },
-  { value: 'wanx2.1-t2i', label: '通义万相 2.1' },
+export interface DashscopeModelInfo {
+  value: string;
+  label: string;
+  apiMode: DashscopeApiMode;
+}
+
+export const DASHSCOPE_MODELS: DashscopeModelInfo[] = [
+  { value: 'qwen-image-2.0-pro', label: 'Qwen-Image 2.0 Pro（推荐）', apiMode: 'sync' },
+  { value: 'qwen-image-2.0', label: 'Qwen-Image 2.0', apiMode: 'sync' },
+  { value: 'qwen-image-max', label: 'Qwen-Image Max', apiMode: 'sync' },
+  { value: 'wan2.6-t2i', label: '万相 2.6（推荐）', apiMode: 'sync' },
+  { value: 'wan2.2-t2i-flash', label: '万相 2.2 极速版', apiMode: 'async-v1' },
 ];
 
 export const VOLCENGINE_MODELS: { value: string; label: string }[] = [
-  { value: 'seedream-4.0', label: 'Seedream 4.0' },
-  { value: 'seedream-3.0', label: 'Seedream 3.0' },
+  { value: 'doubao-seedream-5-0-260128', label: 'Seedream 5.0（推荐）' },
+  { value: 'doubao-seedream-5-0-lite-260128', label: 'Seedream 5.0 Lite' },
+  { value: 'doubao-seedream-4.5', label: 'Seedream 4.5' },
 ];
 
 export interface GenerationRecord {

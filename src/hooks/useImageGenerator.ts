@@ -2,19 +2,34 @@ import { useState, useCallback } from 'react';
 import { useGeneratorStore } from '../store/useGeneratorStore';
 import { buildPrompt } from '../utils/promptUtils';
 import { getPixelDimensions } from '../utils/imageUtils';
-import { IMAGE_SIZE_OPTIONS } from '../types';
-import type { ImageSize, AiModelProvider } from '../types';
+import { IMAGE_SIZE_OPTIONS, DASHSCOPE_MODELS } from '../types';
+import type { ImageSize, AiModelProvider, DashscopeApiMode } from '../types';
 
 function getApiSize(size: ImageSize, provider: AiModelProvider): string {
-  const sizeOption = IMAGE_SIZE_OPTIONS.find((s) => s.value === size);
+  const { width, height } = getPixelDimensions(size);
   if (provider === 'trae') {
+    const sizeOption = IMAGE_SIZE_OPTIONS.find((s) => s.value === size);
     return sizeOption?.apiSize || 'square';
   }
-  const { width, height } = getPixelDimensions(size);
   if (provider === 'dashscope') {
     return `${width}*${height}`;
   }
   return `${width}x${height}`;
+}
+
+function getDashscopeApiMode(modelName: string): DashscopeApiMode {
+  const modelInfo = DASHSCOPE_MODELS.find((m) => m.value === modelName);
+  return modelInfo?.apiMode || 'async-v1';
+}
+
+function mapToDashscopeSize(size: string, modelName: string): string {
+  if (modelName.startsWith('qwen-image')) {
+    return '1024*1024';
+  }
+  if (modelName.startsWith('wan2.6')) {
+    return '1280*1280';
+  }
+  return '1024*1024';
 }
 
 async function generateWithTrae(prompt: string, apiSize: string): Promise<{ blob: Blob; url: string }> {
@@ -32,37 +47,87 @@ async function generateWithTrae(prompt: string, apiSize: string): Promise<{ blob
   return { blob, url: remoteUrl };
 }
 
-async function generateWithDashscope(
+async function generateWithDashscopeSync(
   prompt: string,
-  apiSize: string,
-  apiKey: string,
   modelName: string,
-  onProgress: (p: number) => void
+  apiKey: string,
 ): Promise<{ blob: Blob; url: string }> {
-  if (!apiKey) {
-    throw new Error('请先在设置中配置 DashScope API Key');
-  }
-
-  const submitUrl = '/api/dashscope/api/v1/services/aigc/text2image/image-synthesis';
-  const submitRes = await fetch(submitUrl, {
+  const submitUrl = '/api/dashscope/api/v1/services/aigc/multimodal-generation/generation';
+  const res = await fetch(submitUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: modelName || 'wanx-v1',
-      input: { prompt },
-      parameters: { size: apiSize, n: 1 },
+      model: modelName,
+      input: {
+        messages: [
+          {
+            role: 'user',
+            content: [{ text: prompt }],
+          },
+        ],
+      },
+      parameters: {
+        size: mapToDashscopeSize('', modelName),
+        n: 1,
+        prompt_extend: true,
+        watermark: false,
+      },
     }),
   });
 
-  if (!submitRes.ok) {
-    const errText = await submitRes.text().catch(() => '');
-    throw new Error(`提交任务失败: HTTP ${submitRes.status} ${errText}`);
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`生成失败: HTTP ${res.status} ${errText}`);
   }
 
-  const submitData = await submitRes.json();
+  const data = await res.json();
+  const imageUrl = data.output?.choices?.[0]?.message?.content?.[0]?.image;
+  if (!imageUrl) {
+    const msg = data.message || '生成失败';
+    throw new Error(`生成失败: ${msg}`);
+  }
+
+  const imgRes = await fetch(imageUrl);
+  if (!imgRes.ok) throw new Error('图片下载失败');
+  const blob = await imgRes.blob();
+  return { blob, url: imageUrl };
+}
+
+async function generateWithDashscopeAsync(
+  prompt: string,
+  modelName: string,
+  apiKey: string,
+  onProgress: (p: number) => void,
+): Promise<{ blob: Blob; url: string }> {
+  const submitUrl = '/api/dashscope/api/v1/services/aigc/text2image/image-synthesis';
+  const res = await fetch(submitUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'X-DashScope-Async': 'enable',
+    },
+    body: JSON.stringify({
+      model: modelName,
+      input: { prompt },
+      parameters: {
+        size: mapToDashscopeSize('', modelName),
+        n: 1,
+        prompt_extend: true,
+        watermark: false,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`提交任务失败: HTTP ${res.status} ${errText}`);
+  }
+
+  const submitData = await res.json();
   const taskId = submitData.output?.task_id;
   if (!taskId) {
     throw new Error('未获取到任务 ID');
@@ -77,9 +142,7 @@ async function generateWithDashscope(
     await new Promise((r) => setTimeout(r, 2000));
 
     const taskRes = await fetch(taskUrl, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-      },
+      headers: { 'Authorization': `Bearer ${apiKey}` },
     });
 
     if (!taskRes.ok) {
@@ -113,11 +176,30 @@ async function generateWithDashscope(
   throw new Error('生成超时，请重试');
 }
 
+async function generateWithDashscope(
+  prompt: string,
+  modelName: string,
+  apiKey: string,
+  onProgress: (p: number) => void,
+): Promise<{ blob: Blob; url: string }> {
+  if (!apiKey) {
+    throw new Error('请先在设置中配置阿里云 API Key');
+  }
+
+  const apiMode = getDashscopeApiMode(modelName);
+
+  if (apiMode === 'sync') {
+    return generateWithDashscopeSync(prompt, modelName, apiKey);
+  }
+
+  return generateWithDashscopeAsync(prompt, modelName, apiKey, onProgress);
+}
+
 async function generateWithVolcengine(
   prompt: string,
   apiSize: string,
   apiKey: string,
-  modelName: string
+  modelName: string,
 ): Promise<{ blob: Blob; url: string }> {
   if (!apiKey) {
     throw new Error('请先在设置中配置火山引擎 API Key');
@@ -131,10 +213,11 @@ async function generateWithVolcengine(
       'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: modelName || 'seedream-4.0',
+      model: modelName,
       prompt,
       size: apiSize,
       n: 1,
+      sequential_image_generation: 'disabled',
     }),
   });
 
@@ -204,7 +287,7 @@ export function useImageGenerator() {
           clearInterval(progressInterval);
         }
       } else if (provider === 'dashscope') {
-        result = await generateWithDashscope(finalPrompt, apiSize, apiKey, modelName, setProgress);
+        result = await generateWithDashscope(finalPrompt, modelName, apiKey, setProgress);
       } else if (provider === 'volcengine') {
         setProgress(30);
         result = await generateWithVolcengine(finalPrompt, apiSize, apiKey, modelName);
@@ -277,7 +360,7 @@ export function useImageGenerator() {
           clearInterval(progressInterval);
         }
       } else if (provider === 'dashscope') {
-        result = await generateWithDashscope(finalPrompt, apiSize, apiKey, modelName, setProgress);
+        result = await generateWithDashscope(finalPrompt, modelName, apiKey, setProgress);
       } else if (provider === 'volcengine') {
         setProgress(30);
         result = await generateWithVolcengine(finalPrompt, apiSize, apiKey, modelName);

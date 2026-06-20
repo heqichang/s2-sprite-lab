@@ -28,6 +28,7 @@ export interface GeneratorState {
   style: ArtStyle;
   size: ImageSize;
   currentImage: string | null;
+  lastApiImageUrl: string | null;
   isGenerating: boolean;
   error: string | null;
   records: GenerationRecord[];

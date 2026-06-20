@@ -11,23 +11,21 @@ interface DownloadModalProps {
 }
 
 export function DownloadModal({ onClose }: DownloadModalProps) {
-  const { currentImage, type, style } = useGeneratorStore();
+  const { currentImage, lastApiImageUrl, type, style } = useGeneratorStore();
   const [format, setFormat] = useState<ImageFormat>('png');
   const [fileName, setFileName] = useState(
     `sprite-${type}-${style}-${Date.now()}`
   );
   const [isDownloading, setIsDownloading] = useState(false);
 
+  const sourceImageUrl = lastApiImageUrl || currentImage;
+
   const handleDownload = async () => {
-    if (!currentImage || !fileName.trim()) return;
+    if (!sourceImageUrl || !fileName.trim()) return;
 
     setIsDownloading(true);
     try {
-      let imageUrl = currentImage;
-      if (format === 'jpg') {
-        imageUrl = await convertToJpg(currentImage);
-      }
-      await downloadImage(imageUrl, fileName.trim(), format);
+      await downloadImage(sourceImageUrl, fileName.trim(), format);
       onClose();
     } catch (e) {
       console.error('Download failed:', e);

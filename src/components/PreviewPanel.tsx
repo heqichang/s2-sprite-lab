@@ -15,6 +15,7 @@ import { ASSET_TYPE_OPTIONS, ART_STYLE_OPTIONS } from '../types';
 export function PreviewPanel() {
   const {
     currentImage,
+    lastApiImageUrl,
     prompt,
     type,
     style,
@@ -31,10 +32,10 @@ export function PreviewPanel() {
   const styleLabel = ART_STYLE_OPTIONS.find((o) => o.value === style)?.label || style;
 
   const handleSaveToLibrary = () => {
-    if (!currentImage) return;
+    if (!lastApiImageUrl) return;
     addToLibrary({
       name: `${typeLabel}-${styleLabel}-${Date.now()}`,
-      imageUrl: currentImage,
+      imageUrl: lastApiImageUrl,
       type,
     });
     setSaved(true);

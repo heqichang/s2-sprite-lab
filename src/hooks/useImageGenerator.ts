@@ -38,19 +38,30 @@ export function useImageGenerator() {
 
       const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${finalPrompt}&image_size=${apiSize}`;
 
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`生成失败: HTTP ${response.status}`);
+      }
+      const blob = await response.blob();
+      if (blob.size === 0 || !blob.type.startsWith('image/')) {
+        throw new Error('返回数据无效，请重试');
+      }
+      const objectUrl = URL.createObjectURL(blob);
 
       await new Promise<void>((resolve, reject) => {
+        const img = new Image();
         img.onload = () => resolve();
-        img.onerror = () => reject(new Error('图片加载失败'));
-        img.src = imageUrl;
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('图片解码失败'));
+        };
+        img.src = objectUrl;
       });
 
       clearInterval(progressInterval);
       setProgress(100);
 
-      setCurrentImage(imageUrl);
+      setCurrentImage(objectUrl, imageUrl);
       addRecord({
         prompt,
         type,
@@ -88,19 +99,30 @@ export function useImageGenerator() {
 
       const imageUrl = `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=${finalPrompt}&image_size=${apiSize}`;
 
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`生成失败: HTTP ${response.status}`);
+      }
+      const blob = await response.blob();
+      if (blob.size === 0 || !blob.type.startsWith('image/')) {
+        throw new Error('返回数据无效，请重试');
+      }
+      const objectUrl = URL.createObjectURL(blob);
 
       await new Promise<void>((resolve, reject) => {
+        const img = new Image();
         img.onload = () => resolve();
-        img.onerror = () => reject(new Error('图片加载失败'));
-        img.src = imageUrl;
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('图片解码失败'));
+        };
+        img.src = objectUrl;
       });
 
       clearInterval(progressInterval);
       setProgress(100);
 
-      setCurrentImage(imageUrl);
+      setCurrentImage(objectUrl, imageUrl);
       addRecord({
         prompt: recordPrompt,
         type: recordType,

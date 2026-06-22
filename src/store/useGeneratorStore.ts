@@ -190,9 +190,16 @@ export const useGeneratorStore = create<GeneratorState & GeneratorActions>((set,
 
   setCurrentMode: (mode) => set({ currentMode: mode }),
 
-  setActiveTab: (tab) => set((state) => ({
-    editorState: { ...state.editorState, activeTab: tab },
-  })),
+  setActiveTab: (tab) => set((state) => {
+    const newState = { ...state.editorState, activeTab: tab };
+    if (tab === 'edit' && state.currentImage && !state.editorState.originalImageUrl) {
+      newState.originalImageUrl = state.currentImage;
+      newState.editedImageUrl = state.currentImage;
+      newState.history = [state.currentImage];
+      newState.historyIndex = 0;
+    }
+    return { editorState: newState };
+  }),
 
   setSpriteConfig: (config) => set((state) => ({
     editorState: {

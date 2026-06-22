@@ -51,6 +51,7 @@ export function SpriteEditorPanel() {
     setColorSwapConfig,
     setGridConfig,
     setEditedImage,
+    setOriginalImage,
     pushHistory,
     undo,
     redo,
@@ -147,6 +148,16 @@ export function SpriteEditorPanel() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
+
+  useEffect(() => {
+    if (currentImage && activeTab === 'edit') {
+      if (!originalImageUrl || originalImageUrl !== currentImage) {
+        setOriginalImage(currentImage);
+        setEditedImage(currentImage);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentImage, activeTab]);
 
   const handleSaveToLibrary = () => {
     if (!displayImage) return;

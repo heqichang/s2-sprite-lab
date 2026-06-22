@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useGeneratorStore } from '../store/useGeneratorStore';
 import { PixelButton } from './PixelButton';
 import { ImageFormat } from '../types';
-import { downloadImage, convertToJpg } from '../utils/imageUtils';
+import { downloadImage } from '../utils/imageUtils';
 import { X, Download, FileImage, FileImage as JpgIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 

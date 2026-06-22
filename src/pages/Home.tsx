@@ -3,11 +3,14 @@ import { InputPanel } from '../components/InputPanel';
 import { PreviewPanel } from '../components/PreviewPanel';
 import { HistoryPanel } from '../components/HistoryPanel';
 import { SettingsPanel } from '../components/SettingsPanel';
+import { SpriteGenerator } from '../components/SpriteGenerator';
 import { useGeneratorStore } from '../store/useGeneratorStore';
-import { Gamepad2, Sparkles } from 'lucide-react';
+import { Gamepad2, Sparkles, Layers, Wand2 } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 export function Home() {
   const loadFromStorage = useGeneratorStore((state) => state.loadFromStorage);
+  const { currentMode, setCurrentMode } = useGeneratorStore();
 
   useEffect(() => {
     loadFromStorage();
@@ -57,12 +60,40 @@ export function Home() {
                 </p>
               </div>
             </div>
-            <div className="hidden md:flex items-center gap-4">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm bg-game-card border border-game-border">
-                <div className="w-2 h-2 rounded-full bg-neon-green animate-pulse" />
-                <span className="font-mono text-xs text-gray-400">AI 引擎就绪</span>
+            <div className="flex items-center gap-4">
+              <div className="flex rounded-sm overflow-hidden border-2 border-game-border">
+                <button
+                  onClick={() => setCurrentMode('basic')}
+                  className={cn(
+                    'flex items-center gap-1.5 px-4 py-2 transition-all font-mono text-xs',
+                    currentMode === 'basic'
+                      ? 'bg-neon-purple/20 text-neon-purple border-r border-game-border'
+                      : 'bg-game-bg text-gray-400 hover:text-gray-300 border-r border-game-border'
+                  )}
+                >
+                  <Wand2 className="w-3.5 h-3.5" />
+                  素材生成
+                </button>
+                <button
+                  onClick={() => setCurrentMode('sprite')}
+                  className={cn(
+                    'flex items-center gap-1.5 px-4 py-2 transition-all font-mono text-xs',
+                    currentMode === 'sprite'
+                      ? 'bg-neon-amber/20 text-neon-amber'
+                      : 'bg-game-bg text-gray-400 hover:text-gray-300'
+                  )}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  精灵工厂
+                </button>
               </div>
-              <SettingsPanel />
+              <div className="hidden md:flex items-center gap-4">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm bg-game-card border border-game-border">
+                  <div className="w-2 h-2 rounded-full bg-neon-green animate-pulse" />
+                  <span className="font-mono text-xs text-gray-400">AI 引擎就绪</span>
+                </div>
+                <SettingsPanel />
+              </div>
             </div>
           </div>
 
@@ -72,18 +103,26 @@ export function Home() {
         </header>
 
         <main className="flex-1 flex flex-col gap-6">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 flex-1">
-            <div className="lg:col-span-2">
-              <div className="h-full p-6 rounded-sm bg-game-card/80 backdrop-blur border-2 border-game-border hover:border-neon-purple/50 transition-colors">
-                <InputPanel />
+          {currentMode === 'basic' ? (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 flex-1">
+                <div className="lg:col-span-2">
+                  <div className="h-full p-6 rounded-sm bg-game-card/80 backdrop-blur border-2 border-game-border hover:border-neon-purple/50 transition-colors">
+                    <InputPanel />
+                  </div>
+                </div>
+                <div className="lg:col-span-3">
+                  <div className="h-full p-6 rounded-sm bg-game-card/80 backdrop-blur border-2 border-game-border hover:border-neon-cyan/50 transition-colors">
+                    <PreviewPanel />
+                  </div>
+                </div>
               </div>
+            </>
+          ) : (
+            <div className="flex-1 min-h-[600px]">
+              <SpriteGenerator />
             </div>
-            <div className="lg:col-span-3">
-              <div className="h-full p-6 rounded-sm bg-game-card/80 backdrop-blur border-2 border-game-border hover:border-neon-cyan/50 transition-colors">
-                <PreviewPanel />
-              </div>
-            </div>
-          </div>
+          )}
 
           <div className="p-6 rounded-sm bg-game-card/80 backdrop-blur border-2 border-game-border hover:border-neon-amber/50 transition-colors">
             <HistoryPanel />

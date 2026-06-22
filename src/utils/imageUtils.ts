@@ -10,7 +10,9 @@ function remoteToProxy(url: string): string {
     if (u.pathname.includes('/text_to_image')) {
       return `/api/text-to-image${u.search}`;
     }
-  } catch {}
+  } catch {
+    // ignore URL parse errors
+  }
   return url;
 }
 

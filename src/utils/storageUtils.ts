@@ -52,7 +52,9 @@ export function loadModelConfig(): AiModelConfig {
     if (data) {
       return { ...DEFAULT_MODEL_CONFIG, ...JSON.parse(data) };
     }
-  } catch {}
+  } catch {
+    // ignore JSON parse errors
+  }
   return { ...DEFAULT_MODEL_CONFIG };
 }
 

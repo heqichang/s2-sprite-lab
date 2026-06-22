@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react';
 import { useGeneratorStore } from '../store/useGeneratorStore';
-import { buildPrompt } from '../utils/promptUtils';
+import { buildPrompt, buildSpritePrompt } from '../utils/promptUtils';
 import { getPixelDimensions, resizeImage, getClosestSupportedSize } from '../utils/imageUtils';
 import { IMAGE_SIZE_OPTIONS, DASHSCOPE_MODELS } from '../types';
-import type { ImageSize, AiModelProvider, DashscopeApiMode } from '../types';
+import type { ImageSize, AiModelProvider, DashscopeApiMode, SpriteConfig } from '../types';
 
 const QWEN_IMAGE_SYNC_SIZES = [
   { w: 2048, h: 2048 },
@@ -489,5 +489,88 @@ export function useImageGenerator() {
     }
   }, [modelConfig, setIsGenerating, setCurrentImage, setError, addRecord]);
 
-  return { generateImage, regenerateImage, progress };
+  const generateSprite = useCallback(async (spriteConfig: SpriteConfig) => {
+    const { prompt, type, style, size, modelConfig, setIsGenerating, setCurrentImage, setError, setEditedImage, setOriginalImage } = useGeneratorStore.getState();
+
+    const { provider, apiKey, modelName } = modelConfig;
+
+    if (provider !== 'trae' && !apiKey) {
+      setError('请先在模型设置中配置 API Key');
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+    setProgress(0);
+
+    try {
+      const apiSize = getApiSize(size, provider, modelName);
+      const targetDim = getPixelDimensions(size);
+      const finalPrompt = buildSpritePrompt(prompt, spriteConfig, style, size);
+
+      let result: { blob: Blob; url: string };
+
+      if (provider === 'trae') {
+        const progressInterval = setInterval(() => {
+          setProgress((prev) => (prev < 90 ? prev + 5 : prev));
+        }, 200);
+
+        try {
+          result = await generateWithTrae(finalPrompt, apiSize);
+        } finally {
+          clearInterval(progressInterval);
+        }
+      } else if (provider === 'dashscope') {
+        result = await generateWithDashscope(finalPrompt, modelName, apiKey, apiSize, setProgress);
+      } else if (provider === 'volcengine') {
+        setProgress(30);
+        result = await generateWithVolcengine(finalPrompt, apiSize, apiKey, modelName);
+      } else {
+        throw new Error('不支持的模型提供商');
+      }
+
+      setProgress(92);
+
+      let finalBlob = result.blob;
+      if (targetDim.width && targetDim.height) {
+        finalBlob = await resizeImage(result.blob, targetDim.width, targetDim.height);
+      }
+
+      setProgress(98);
+
+      const objectUrl = URL.createObjectURL(finalBlob);
+
+      await new Promise<void>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve();
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('图片解码失败'));
+        };
+        img.src = objectUrl;
+      });
+
+      setProgress(100);
+
+      setCurrentImage(objectUrl, result.url);
+      setOriginalImage(objectUrl);
+      setEditedImage(objectUrl);
+
+      useGeneratorStore.getState().addRecord({
+        prompt,
+        type,
+        style,
+        size,
+        imageUrl: result.url,
+      });
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : '生成失败，请重试';
+      setError(errorMessage);
+    } finally {
+      setIsGenerating(false);
+      setProgress(0);
+    }
+  }, []);
+
+  return { generateImage, regenerateImage, generateSprite, progress };
 }

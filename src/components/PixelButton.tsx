@@ -1,7 +1,7 @@
 import { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from '../lib/utils';
 
-type PixelButtonVariant = 'primary' | 'secondary' | 'danger' | 'success';
+type PixelButtonVariant = 'primary' | 'secondary' | 'danger' | 'success' | 'warning';
 type PixelButtonSize = 'sm' | 'md' | 'lg';
 
 interface PixelButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -16,6 +16,7 @@ const variantClasses: Record<PixelButtonVariant, string> = {
   secondary: 'bg-neon-cyan/20 text-neon-cyan border-neon-cyan hover:bg-neon-cyan/30 hover:shadow-neon-cyan',
   danger: 'bg-red-500/20 text-red-400 border-red-500 hover:bg-red-500/30',
   success: 'bg-neon-green/20 text-neon-green border-neon-green hover:bg-neon-green/30',
+  warning: 'bg-neon-amber/20 text-neon-amber border-neon-amber hover:bg-neon-amber/30',
 };
 
 const sizeClasses: Record<PixelButtonSize, string> = {

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import type { GridConfig } from '../types';
 import { cn } from '../lib/utils';
 
@@ -22,6 +22,7 @@ export function SpriteCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const containerSizeRef = useRef({ width: 0, height: 0 });
   const [isDrawing, setIsDrawing] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
@@ -73,28 +74,37 @@ export function SpriteCanvas({
     }
   };
 
-  const drawImage = useCallback(() => {
+  const drawImage = () => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container || !imageUrl) return;
 
+    const containerW = container.clientWidth;
+    const containerH = container.clientHeight;
+    if (containerW <= 0 || containerH <= 0) return;
+
+    containerSizeRef.current = { width: containerW, height: containerH };
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const draw = () => {
-      if (!imageRef.current || !canvasRef.current) return;
-      const img = imageRef.current;
+    const drawToCanvas = (img: HTMLImageElement) => {
+      if (!canvasRef.current) return;
       const c = canvasRef.current;
+      const cW = containerSizeRef.current.width;
+      const cH = containerSizeRef.current.height;
 
-      const containerRatio = container.clientWidth / container.clientHeight;
+      if (cW <= 0 || cH <= 0) return;
+
+      const containerRatio = cW / cH;
       const imgRatio = img.width / img.height;
 
       let drawW: number, drawH: number;
       if (imgRatio > containerRatio) {
-        drawW = container.clientWidth * 0.8;
+        drawW = cW * 0.8;
         drawH = drawW / imgRatio;
       } else {
-        drawH = container.clientHeight * 0.8;
+        drawH = cH * 0.8;
         drawW = drawH * imgRatio;
       }
 
@@ -109,22 +119,43 @@ export function SpriteCanvas({
       drawOverlays(ctx, c.width, c.height);
     };
 
+    if (imageRef.current && imageRef.current.src === imageUrl) {
+      drawToCanvas(imageRef.current);
+      return;
+    }
+
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       imageRef.current = img;
-      draw();
+      drawToCanvas(img);
     };
     img.src = imageUrl;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageUrl, gridConfig]);
+  };
 
   useEffect(() => {
-    drawImage();
-    const handleResize = () => drawImage();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [drawImage]);
+    const container = containerRef.current;
+    if (!container) return;
+
+    let rafId: number;
+    const scheduleDraw = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => drawImage());
+    };
+
+    const resizeObserver = new ResizeObserver(() => {
+      scheduleDraw();
+    });
+    resizeObserver.observe(container);
+
+    scheduleDraw();
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      resizeObserver.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageUrl, gridConfig]);
 
   const getCanvasCoords = (e: React.MouseEvent) => {
     const canvas = canvasRef.current;
